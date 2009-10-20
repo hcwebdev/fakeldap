@@ -17,5 +17,6 @@ setup(
     # tests_require=[
     #     'mock',
     # ],
+    # extras_require=dict(tests=['mock']),
     
 )
