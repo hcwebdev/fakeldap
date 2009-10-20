@@ -1,0 +1,22 @@
+[buildout]
+develop = 
+    src/fakeldap
+parts = 
+    python
+    test-fakeldap
+eggs = 
+    python-ldap
+    mock
+    fakeldap
+unzip = true
+
+[python]
+recipe = zc.recipe.egg
+interpreter = python
+eggs = ${buildout:eggs}
+
+[test-fakeldap]
+recipe = zc.recipe.testrunner
+script = test-fakeldap
+eggs = ${buildout:eggs}
+defaults = ['--tests-pattern', '^fakeldap']
