@@ -1,1 +1,1 @@
-from tools import fake_out_ldap
+from tools import fake_out_ldap, clear, populate
