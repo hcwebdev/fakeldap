@@ -14,12 +14,10 @@ class ToolsTestCase(unittest.TestCase):
     def test_faking_out_ldap(self):
         tools.fake_out_ldap()
         import ldap
-        
         self.failUnless(hasattr(ldap, 'TREE'))
     
     def test_not_faking_out_ldap(self):
         import ldap
-        
         self.failIf(hasattr(ldap, 'TREE'))
     
     def test_populating(self):
@@ -31,10 +29,11 @@ class ToolsTestCase(unittest.TestCase):
             ('ou=c,ou=b,ou=a,%s' % base, {'objectClass': ['top', 'organizationalUnit']}),
             ('ou=d,ou=c,ou=b,ou=a,%s' % base, {'objectClass': ['top', 'organizationalUnit']}),
         ]
-        tools.fake_out_ldap()
-        tools.populate(url, base, records)
-        import ldap
         
+        tools.populate(url, base, records)
+        
+        tools.fake_out_ldap()
+        import ldap
         self.failUnlessEqual(ldap.TREE, {
             'ldap://ldap.test.com': {
                 'dc=test': {
