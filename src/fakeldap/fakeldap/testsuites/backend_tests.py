@@ -5,7 +5,7 @@ from fakeldap import backend
 class FakeLDAPTestCase(unittest.TestCase):
     
     def tearDown(self):
-        backend.clearTree()
+        backend.TREE.clear()
     
     def makeOU(self, base, ou):
         dn = 'ou=%s,%s' % (ou, base)
@@ -125,6 +125,25 @@ class FakeLDAPAddingTestCase(FakeLDAPTestCase):
         
         c.add_s(dn, attrs)
         self.assertRaises(backend.ALREADY_EXISTS, c.add_s, dn, attrs)
+    
+
+
+class FakeLDAPClearingTestCase(FakeLDAPTestCase):
+    
+    def test_clearing_only_single_branch(self):
+        backend.addTreeItems('ldap://ldap.example.com', 'dc=example,dc=com')
+        backend.addTreeItems('ldap://ldap.example.org', 'dc=example,dc=org')
+        backend.clearTree()
+        self.assertEqual(backend.TREE, {})
+    
+    def test_clearing_only_single_branch(self):
+        backend.addTreeItems('ldap://ldap.example.com', 'dc=example,dc=com')
+        backend.addTreeItems('ldap://ldap.example.org', 'dc=example,dc=org')
+        backend.clearTree('ldap://ldap.example.org')
+        self.assertEqual(backend.TREE, {
+            'ldap://ldap.example.com': {'dc=com': {'dn': 'dc=com', 'dc=example': {'dn': 'dc=example,dc=com'}}},
+            'ldap://ldap.example.org': {},
+        })
     
 
 

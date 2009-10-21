@@ -15,6 +15,8 @@ def populate(url, base, records):
     for dn, attrs in records:
         c.add_s(dn, attrs)
     
+def clear(url=None):
+    backend.clearTree(url=url)
 
 
 

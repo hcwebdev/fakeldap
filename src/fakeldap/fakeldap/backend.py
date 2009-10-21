@@ -56,8 +56,12 @@ def explode_dn(dn, *ign, **ignored):
     """ Get a DN's elements """
     return [x.strip() for x in dn.split(',')]
 
-def clearTree():
-    TREE.clear()
+def clearTree(url=None):
+    if url is None:
+        TREE.clear()
+    elif TREE.has_key(url):
+        TREE[url].clear()
+    
 
 def addTreeItems(conn_str, dn):
     """ Add structure directly to the tree given a DN """
