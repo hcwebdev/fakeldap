@@ -619,7 +619,77 @@ class FakeLDAPMovingTestCase(FakeLDAPPopulatedTestCase):
     
 
 
-
+class FakeLDAPRequiringAuthTestCase(FakeLDAPPopulatedTestCase):
+    
+    def test_setup_auth_required_for_backend(self):
+        backend.force_auth_required('ldap://other.example.com')
+        self.assert_(backend.requires_auth('ldap://other.example.com'))
+    
+    def test_setup_auth_required_for_backend_toggles_existing_root(self):
+        self.failIf(backend.requires_auth(self.ldapurl))
+        backend.force_auth_required(self.ldapurl)
+        self.assert_(backend.requires_auth(self.ldapurl))
+    
+    def test_search_fails_when_auth_required(self):
+        backend.force_auth_required(self.ldapurl)
+        connection = backend.initialize(self.ldapurl)
+        results = connection.search_s(self.root_dn)
+        self.assertEqual(len(results), 0)
+    
+    def test_deletions_fail_when_auth_required(self):
+        backend.force_auth_required(self.ldapurl)
+        connection = backend.initialize(self.ldapurl)
+        dn = 'uid=jradford,ou=users,%s' % self.root_dn
+        self.assertRaises(backend.LDAPError, connection.delete_s, dn)
+    
+    def test_modifications_fail_when_auth_required(self):
+        backend.force_auth_required(self.ldapurl)
+        connection = backend.initialize(self.ldapurl)
+        dn = 'uid=jradford,ou=users,%s' % self.root_dn
+        mod_attrs = [( backend.MOD_ADD, 'testattr', 'TESTATTR' )]
+        self.assertRaises(backend.LDAPError, connection.modify_s, dn, mod_attrs)
+    
+    def XXtest_bind_with_directory_manager(self):
+        ldapurl = 'ldap://ldap.example.com'
+        connection = backend.initialize(ldapurl)
+        result = connection.simple_bind_s('Manager', 'password')
+        self.assert_(result)
+    
+    def XXtest_bind_with_blank_password(self):
+        ldapurl = 'ldap://ldap.example.com'
+        connection = backend.initialize(ldapurl)
+        result = connection.simple_bind_s('noone', '')
+        self.assert_(result)
+    
+    def XXtest_bind_with_user(self):
+        ldapurl = 'ldap://ldap.example.com'
+        dom = 'dc=example,dc=com'
+        backend.addTreeItems(ldapurl, dom)
+        connection = backend.initialize(ldapurl)
+        connection.add_s(*self.makeOU('dc=example,dc=com', 'users'))
+        connection.add_s(*self.makeUser('ou=users,dc=example,dc=com', 'jradford', 'Jacob', 'Radford'))
+        result = connection.simple_bind_s('uid=jradford,ou=users,dc=example,dc=com', 'password')
+        self.assert_(result)
+    
+    def XXtest_bind_with_user_but_wrong_pass(self):
+        ldapurl = 'ldap://ldap.example.com'
+        dom = 'dc=example,dc=com'
+        backend.addTreeItems(ldapurl, dom)
+        connection = backend.initialize(ldapurl)
+        connection.add_s(*self.makeOU('dc=example,dc=com', 'users'))
+        connection.add_s(*self.makeUser('ou=users,dc=example,dc=com', 'jradford', 'Jacob', 'Radford'))
+        
+        self.assertRaises(backend.INVALID_CREDENTIALS, connection.simple_bind_s, 'uid=jradford,ou=users,dc=example,dc=com', 'badpassword')
+    
+    def XXtest_bind_with_non_existant_user(self):
+        ldapurl = 'ldap://ldap.example.com'
+        dom = 'dc=example,dc=com'
+        backend.addTreeItems(ldapurl, dom)
+        connection = backend.initialize(ldapurl)
+        connection.add_s(*self.makeOU('dc=example,dc=com', 'users'))
+        self.assertRaises(backend.NO_SUCH_OBJECT, connection.simple_bind_s, 'uid=noone,ou=users,dc=example,dc=com', 'password')
+    
+    
 
 
 

@@ -79,6 +79,21 @@ def addTreeItems(conn_str, dn):
         tree_pos = tree_pos[elem]
     
 
+def force_auth_required(conn_str):
+    if not TREE.has_key(conn_str):
+        TREE[conn_str] = cidict()
+    
+    tree_pos = TREE[conn_str]
+    tree_pos['authed'] = True
+
+def requires_auth(conn_str):
+    if TREE.has_key(conn_str):
+        tree_pos = TREE[conn_str]
+        if tree_pos.has_key('authed'):
+            return tree_pos['authed']
+    
+    return False
+
 def sha_encode(paswd):
     sha_pswd = sha.new(paswd)
     sha_dig = sha_pswd.digest()
@@ -249,22 +264,25 @@ class FakeLDAPConnection(object):
     
     def __init__(self, conn_str):
         self.conn_str = conn_str
-        self.valid = True
+        self.invalid = False
+        # need to check for initial bind (even if only anonymous)
+        # also need to check whether a non-anonymous bind is allowed
         if not TREE.has_key(conn_str):
             TREE[conn_str] = cidict()
     
     def set_option(self, option, invalue):
-        if not self.valid:
+        if self.invalid:
             raise LDAPError('LDAP connection invalid')
         
     
     def simple_bind_s(self, who, cred):
-        if not self.valid:
+        if self.invalid:
             raise LDAPError('LDAP connection invalid')
         
         if who.find('Manager') != -1:
             return 1
         
+        # if auth required, then don't do this...
         if cred == '':
             # Emulate LDAP mis-behavior
             return 1
@@ -280,23 +298,19 @@ class FakeLDAPConnection(object):
                     rec_pwd = val_list[0]
                     break
         
-        if not rec_pwd:
-            raise INVALID_CREDENTIALS
-        
-        if enc_bindpwd == rec_pwd:
+        if rec_pwd and rec_pwd == enc_bindpwd:
             return 1
-        else:
-            raise INVALID_CREDENTIALS
         
+        raise INVALID_CREDENTIALS
     
     def unbind_s(self):
-        if not self.valid:
+        if self.invalid:
             raise LDAPError('LDAP connection invalid')
         
-        self.valid = False
+        self.invalid = True
     
     def search_s(self, base, scope=SCOPE_SUBTREE, filterstr='(objectClass=*)', attrlist=None, *ign, **ignored):
-        if not self.valid:
+        if self.invalid:
             raise LDAPError('LDAP connection invalid')
         
         elems = explode_dn(base)
@@ -381,7 +395,7 @@ class FakeLDAPConnection(object):
         
     
     def add_s(self, dn, modlist):
-        if not self.valid:
+        if self.invalid:
             raise LDAPError('LDAP connection invalid')
         
         elems = explode_dn(dn)
@@ -412,7 +426,7 @@ class FakeLDAPConnection(object):
         
     
     def delete_s(self, dn):
-        if not self.valid:
+        if self.invalid:
             raise LDAPError('LDAP connection invalid')
         
         elems = explode_dn(dn)
@@ -432,7 +446,7 @@ class FakeLDAPConnection(object):
         
     
     def modify_s(self, dn, modlist):
-        if not self.valid:
+        if self.invalid:
             raise LDAPError('LDAP connection invalid')
         
         elems = explode_dn(dn)
@@ -482,7 +496,7 @@ class FakeLDAPConnection(object):
         tree_pos[rdn] = rec
     
     def modrdn_s(self, dn, newrdn, delold=True):
-        if not self.valid:
+        if self.invalid:
             raise LDAPError('LDAP connection invalid')
         
         elems = explode_dn(dn)
