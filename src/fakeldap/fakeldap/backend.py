@@ -52,6 +52,9 @@ def initialize(conn_str):
     """ Initialize a new connection """
     return FakeLDAPConnection(conn_str)
 
+def set_option(option, invalue):
+    pass
+
 def explode_dn(dn, *ign, **ignored):
     """ Get a DN's elements """
     return [x.strip() for x in dn.split(',')]
