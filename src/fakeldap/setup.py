@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name = "fakeldap",
-    version = "1.4",
+    version = "1.5",
     url = 'http://github.com/hcwebdev/fakeldap',
     license = '',
     description = "Fake LDAP Tools",
