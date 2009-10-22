@@ -39,6 +39,10 @@ class FakeLDAPStructureTestCase(FakeLDAPTestCase):
         self.assertEqual(backend.TREE.has_key('ldap://ldap.example.org'), True)
         self.assertEqual(backend.TREE['ldap://ldap.example.org'], {})
     
+    def test_fakeldap_has_set_option_method(self):
+        self.assert_(hasattr(backend, 'set_option'))
+        self.assert_(callable(backend.set_option))
+    
 
 
 class FakeLDAPConnectingTestCase(FakeLDAPTestCase):
