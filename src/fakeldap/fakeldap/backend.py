@@ -92,8 +92,23 @@ def force_auth_required(conn_str):
 def requires_auth(conn_str):
     if TREE.has_key(conn_str):
         tree_pos = TREE[conn_str]
-        if tree_pos.has_key('authed'):
-            return tree_pos['authed']
+        if tree_pos.has_key('__auth_required__'):
+            return tree_pos['__auth_required__']
+    
+    return False
+
+def make_ad_directory(conn_str):
+    if not TREE.has_key(conn_str):
+        TREE[conn_str] = cidict()
+    
+    tree_pos = TREE[conn_str]
+    tree_pos['__active_directory__'] = True
+
+def is_ad_directory(conn_str):
+    if TREE.has_key(conn_str):
+        tree_pos = TREE[conn_str]
+        if tree_pos.has_key('__active_directory__'):
+            return tree_pos['__active_directory__']
     
     return False
 
@@ -296,8 +311,13 @@ class FakeLDAPConnection(object):
         rec = self.search_s(who)
         if rec and len(rec) == 1:
             rec = rec[0][1]
+            
+            auth_key = 'userPassword'
+            if is_ad_directory(self.conn_str):
+                auth_key = 'unicodePwd'
+            
             for key, val_list in rec.items():
-                if key == 'userPassword':
+                if key == auth_key:
                     rec_pwd = val_list[0]
                     break
         
