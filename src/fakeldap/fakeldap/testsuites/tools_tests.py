@@ -11,6 +11,9 @@ class ToolsTestCase(unittest.TestCase):
         if sys.modules.has_key('ldap'):
             del sys.modules['ldap']
     
+    def tearDown(self):
+        tools.clear()
+    
     def test_faking_out_ldap(self):
         tools.fake_out_ldap()
         import ldap
@@ -62,5 +65,46 @@ class ToolsTestCase(unittest.TestCase):
             }
         })
     
+    def test_toggle_directory_type(self):
+        pass
+    
+    def test_check_password(self):
+        ldapurl = 'ldap://ldap.example.com'
+        base = 'dc=example,dc=com'
+        records = [
+            ('ou=users,%s' % base, {'objectClass': ['top', 'organizationalUnit']}),
+            ('uid=jradford,ou=users,dc=example,dc=com', {'uid': ['jradford'], 'objectClass': ['person', 'inetOrgPerson'], 'userPassword': ['password'], 'sn': ['Radford'], 'givenName': ['Jacob'], 'cn': ['Jacob Radford']}),
+        ]
+        tools.populate(ldapurl, base, records)
+        result = tools.check_password(ldapurl, 'uid=jradford,ou=users,dc=example,dc=com', 'password')
+        self.assert_(result)
+    
+    def test_check_password_SHA_encoded(self):
+        ldapurl = 'ldap://ldap.example.com'
+        base = 'dc=example,dc=com'
+        from fakeldap.backend import _sha_encode
+        records = [
+            ('ou=users,%s' % base, {'objectClass': ['top', 'organizationalUnit']}),
+            ('uid=jradford,ou=users,dc=example,dc=com', {'uid': ['jradford'], 'objectClass': ['person', 'inetOrgPerson'], 'userPassword': [_sha_encode('password')], 'sn': ['Radford'], 'givenName': ['Jacob'], 'cn': ['Jacob Radford']}),
+        ]
+        tools.populate(ldapurl, base, records)
+        result = tools.check_password(ldapurl, 'uid=jradford,ou=users,dc=example,dc=com', 'password')
+        self.assert_(result)
+    
+    def test_check_password_AD_encoded(self):
+        ldapurl = 'ldap://ldap.example.com'
+        base = 'dc=example,dc=com'
+        from fakeldap.backend import _uni_encode
+        records = [
+            ('ou=users,%s' % base, {'objectClass': ['top', 'organizationalUnit']}),
+            ('uid=jradford,ou=users,dc=example,dc=com', {'uid': ['jradford'], 'objectClass': ['person', 'inetOrgPerson'], 'unicodePwd': [_uni_encode('password')], 'sn': ['Radford'], 'givenName': ['Jacob'], 'cn': ['Jacob Radford']}),
+        ]
+        tools.populate(ldapurl, base, records)
+        tools.toggle_directory_type(ldapurl)
+        result = tools.check_password(ldapurl, 'uid=jradford,ou=users,dc=example,dc=com', 'password')
+        self.assert_(result)
+    
+
+
 
 

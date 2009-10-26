@@ -26,7 +26,7 @@ _to_import = [
     'REFERRAL',
     
     'LDAPError', 'SERVER_DOWN', 'PROTOCOL_ERROR', 'NO_SUCH_OBJECT', 'INVALID_CREDENTIALS', 
-    'ALREADY_EXISTS', 'SIZELIMIT_EXCEEDED', 'PARTIAL_RESULTS', 'FILTER_ERROR',
+    'ALREADY_EXISTS', 'SIZELIMIT_EXCEEDED', 'PARTIAL_RESULTS', 'FILTER_ERROR', 'STRONG_AUTH_REQUIRED',
     
     'OPT_API_FEATURE_INFO', 'OPT_API_INFO', 'OPT_CLIENT_CONTROLS', 'OPT_DEBUG_LEVEL', 'OPT_DEREF', 
     'OPT_DIAGNOSTIC_MESSAGE', 'OPT_ERROR_NUMBER', 'OPT_ERROR_STRING', 'OPT_HOST_NAME', 'OPT_MATCHED_DN', 
@@ -45,12 +45,18 @@ for import_el in _to_import:
     setattr(__module__, import_el, getattr(ldap, import_el))
 
 
+class modlist(object):
+    addModlist = addModlist
+
+
 TREE = cidict()
 
-
+##########################
+###     PUBLIC API     ###
+##########################
 def initialize(conn_str):
     """ Initialize a new connection """
-    return FakeLDAPConnection(conn_str)
+    return _FakeLDAPConnection(conn_str)
 
 def set_option(option, invalue):
     pass
@@ -59,14 +65,18 @@ def explode_dn(dn, *ign, **ignored):
     """ Get a DN's elements """
     return [x.strip() for x in dn.split(',')]
 
-def clearTree(url=None):
+
+###########################
+###     PRIVATE API     ###
+###########################
+def _clearTree(url=None):
     if url is None:
         TREE.clear()
     elif TREE.has_key(url):
         TREE[url].clear()
     
 
-def addTreeItems(conn_str, dn):
+def _addTreeItems(conn_str, dn, attrs=None):
     """ Add structure directly to the tree given a DN """
     elems = explode_dn(dn)
     elems.reverse()
@@ -81,15 +91,30 @@ def addTreeItems(conn_str, dn):
         
         tree_pos = tree_pos[elem]
     
+    if attrs is not None:
+        rec = tree_pos
+        
+        rdn = elems[-1]
+        k,v = rdn.split('=')
+        rec[k] = [v]
+        
+        for key, val in attrs.items():
+            if isinstance(val, list):
+                rec[key] = val
+            else:
+                rec[key] = [val]
 
-def force_auth_required(conn_str):
+def _toggle_auth_required(conn_str):
     if not TREE.has_key(conn_str):
         TREE[conn_str] = cidict()
     
     tree_pos = TREE[conn_str]
-    tree_pos['authed'] = True
+    if tree_pos.has_key('__auth_required__'):
+        tree_pos['__auth_required__'] = not tree_pos['__auth_required__']
+    else:
+        tree_pos['__auth_required__'] = True
 
-def requires_auth(conn_str):
+def _requires_auth(conn_str):
     if TREE.has_key(conn_str):
         tree_pos = TREE[conn_str]
         if tree_pos.has_key('__auth_required__'):
@@ -97,14 +122,17 @@ def requires_auth(conn_str):
     
     return False
 
-def make_ad_directory(conn_str):
+def _toggle_ad_directory(conn_str):
     if not TREE.has_key(conn_str):
         TREE[conn_str] = cidict()
     
     tree_pos = TREE[conn_str]
-    tree_pos['__active_directory__'] = True
+    if tree_pos.has_key('__active_directory__'):
+        tree_pos['__active_directory__'] = not tree_pos['__active_directory__']
+    else:
+        tree_pos['__active_directory__'] = True
 
-def is_ad_directory(conn_str):
+def _is_ad_directory(conn_str):
     if TREE.has_key(conn_str):
         tree_pos = TREE[conn_str]
         if tree_pos.has_key('__active_directory__'):
@@ -112,13 +140,17 @@ def is_ad_directory(conn_str):
     
     return False
 
-def sha_encode(paswd):
-    sha_pswd = sha.new(paswd)
-    sha_dig = sha_pswd.digest()
-    paswd_enc = base64.encodestring(sha_dig).strip()
-    return '{SHA}%s' % paswd_enc
+def _sha_encode(password):
+    ctx = sha.new(password)
+    enc_passwd = base64.encodestring( ctx.digest() ).strip()
+    return '{SHA}%s' % enc_passwd
 
-def attronly(val):
+def _uni_encode(password):
+    uni_passwd = unicode('"%s"' % password, "iso-8859-1")
+    enc_passwd = uni_passwd.encode("utf-16-le")
+    return enc_passwd
+
+def _attronly(val):
     result = cidict()
     
     for k,v in val.items():
@@ -127,7 +159,7 @@ def attronly(val):
     
     return result
 
-def walk_the_tree(tree):
+def _walk_the_tree(tree):
     results = []
     
     if isinstance(tree, (dict, cidict)):
@@ -138,14 +170,10 @@ def walk_the_tree(tree):
             
             if isinstance(v, (dict, cidict)) and v.has_key('dn'):
                 dn = v.get('dn')
-                results.append((dn, attronly(v)))
-                results.extend(walk_the_tree(v))
+                results.append((dn, _attronly(v)))
+                results.extend(_walk_the_tree(v))
     
     return results
-
-
-class modlist(object):
-    addModlist = addModlist
 
 
 
@@ -161,7 +189,7 @@ FULL = '\((?P<op>(%s))(?P<fltr>.*)\)' % _OP
 OP_RE = re.compile(OP)
 FULL_RE = re.compile(FULL)
 
-class Op(object):
+class _Op(object):
     
     def __init__(self, op):
         self.op = op
@@ -169,9 +197,9 @@ class Op(object):
     
     def __repr__(self):
         if self.parts:
-            return "Op('%s' => %s)" % (self.op, ', '.join(['%r' % p for p in self.parts]))
+            return "_Op('%s' => %s)" % (self.op, ', '.join(['%r' % p for p in self.parts]))
         else:
-            return "Op('%s')" % self.op
+            return "_Op('%s')" % self.op
     
     def matches(self, val):
         # AND filter
@@ -195,7 +223,7 @@ class Op(object):
     
 
 
-class Filter(object):
+class _Filter(object):
     
     def __init__(self, attr, comp, value):
         self.attr = attr
@@ -203,7 +231,7 @@ class Filter(object):
         self.value = value
     
     def __repr__(self):
-        return "Filter('%s', '%s', '%s')" % (self.attr, self.comp, self.value)
+        return "_Filter('%s', '%s', '%s')" % (self.attr, self.comp, self.value)
     
     def matches(self, val):
         if val.has_key(self.attr):
@@ -229,7 +257,7 @@ class Filter(object):
     
 
 
-class Parser(object):
+class _Parser(object):
     
     def __init__(self, query_str):
         parsed = self.parse_query(query_str)
@@ -250,7 +278,7 @@ class Parser(object):
             m = expr.match(query_str)
             if m:
                 d = m.groupdict()
-                op = Op(d['op'])
+                op = _Op(d['op'])
                 
                 op.parts.extend(self.parse_query(d['fltr']))
                 
@@ -269,7 +297,7 @@ class Parser(object):
             raise ValueError(query_str)
         
         d = m.groupdict()
-        parts.append(Filter(d['attr'], d['comp'], d['value']))
+        parts.append(_Filter(d['attr'], d['comp'], d['value']))
         
         if d['fltr']:
             parts.extend(self.parse_query(d['fltr'], recurse=True))
@@ -278,42 +306,48 @@ class Parser(object):
     
 
 
-class FakeLDAPConnection(object):
+class _FakeLDAPConnection(object):
     
     def __init__(self, conn_str):
         self.conn_str = conn_str
         self.invalid = False
         # need to check for initial bind (even if only anonymous)
         # also need to check whether a non-anonymous bind is allowed
+        self.bound = None
         if not TREE.has_key(conn_str):
-            TREE[conn_str] = cidict()
+            # TREE[conn_str] = cidict()
+            raise SERVER_DOWN
     
     def set_option(self, option, invalue):
         if self.invalid:
             raise LDAPError('LDAP connection invalid')
         
     
-    def simple_bind_s(self, who, cred):
+    def simple_bind_s(self, who="", cred=""):
         if self.invalid:
             raise LDAPError('LDAP connection invalid')
         
         if who.find('Manager') != -1:
+            self.bound = 'AUTHORIZED'
             return 1
         
-        # if auth required, then don't do this...
-        if cred == '':
-            # Emulate LDAP mis-behavior
-            return 1
+        if not cred:
+            if _requires_auth(self.conn_str) and who:
+                self.bound = None
+                raise UNWILLING_TO_PERFORM({'info': 'unauthenticated bind (DN with no password) disallowed', 'desc': 'Server is unwilling to perform'})
+            else:
+                # Emulate LDAP mis-behavior
+                self.bound = 'ANONYMOUS'
+                return 1
         
-        enc_bindpwd = cred
         rec_pwd = ''
         
-        rec = self.search_s(who)
+        rec = self._search_s(who)
         if rec and len(rec) == 1:
             rec = rec[0][1]
             
             auth_key = 'userPassword'
-            if is_ad_directory(self.conn_str):
+            if _is_ad_directory(self.conn_str):
                 auth_key = 'unicodePwd'
             
             for key, val_list in rec.items():
@@ -321,9 +355,25 @@ class FakeLDAPConnection(object):
                     rec_pwd = val_list[0]
                     break
         
-        if rec_pwd and rec_pwd == enc_bindpwd:
-            return 1
-        
+        if rec_pwd:
+            if _is_ad_directory(self.conn_str):
+                enc_bindpwd = _uni_encode(cred)
+                if rec_pwd == enc_bindpwd:
+                    self.bound = 'AUTHORIZED'
+                    return 1
+            else:
+                if rec_pwd.lower().startswith('{sha}'):
+                    enc_bindpwd = _sha_encode(cred)
+                    if rec_pwd[5:] == enc_bindpwd[5:]:
+                        self.bound = 'AUTHORIZED'
+                        return 1
+            
+            enc_bindpwd = cred
+            if rec_pwd == enc_bindpwd:
+                self.bound = 'AUTHORIZED'
+                return 1
+            
+        self.bound = None
         raise INVALID_CREDENTIALS
     
     def unbind_s(self):
@@ -333,6 +383,12 @@ class FakeLDAPConnection(object):
         self.invalid = True
     
     def search_s(self, base, scope=SCOPE_SUBTREE, filterstr='(objectClass=*)', attrlist=None, *ign, **ignored):
+        if self.bound is None or (_requires_auth(self.conn_str) and self.bound == 'ANONYMOUS'):
+            return []
+        
+        return self._search_s(base, scope=scope, filterstr=filterstr, attrlist=attrlist, *ign, **ignored)
+    
+    def _search_s(self, base, scope=SCOPE_SUBTREE, filterstr='(objectClass=*)', attrlist=None, *ign, **ignored):
         if self.invalid:
             raise LDAPError('LDAP connection invalid')
         
@@ -349,11 +405,11 @@ class FakeLDAPConnection(object):
         # if query == '(objectClass=*)':
         #     results = []
         #     if scope == SCOPE_BASE:
-        #         attrs = attronly(tree_pos)
+        #         attrs = _attronly(tree_pos)
         #         if attrs.has_key('objectClass'):
         #             results.append(([base, attrs],))
         #     else:
-        #         for k,v in walk_the_tree(tree_pos):
+        #         for k,v in _walk_the_tree(tree_pos):
         #             if v.has_key('objectClass'):
         #                 results.append((k,v))
         #     return results
@@ -396,15 +452,15 @@ class FakeLDAPConnection(object):
         # else:
         
         results = []
-        q = Parser(filterstr)
+        q = _Parser(filterstr)
         
         
-        val = attronly(tree_pos)
+        val = _attronly(tree_pos)
         if q.matches(val):
             results.append( (base, val) )
         
         if scope == SCOPE_SUBTREE:
-            for key, val in walk_the_tree(tree_pos):
+            for key, val in _walk_the_tree(tree_pos):
                 if q.matches(val):
                     results.append( (key, val) )
         
@@ -420,6 +476,8 @@ class FakeLDAPConnection(object):
     def add_s(self, dn, modlist):
         if self.invalid:
             raise LDAPError('LDAP connection invalid')
+        if self.bound is None or (_requires_auth(self.conn_str) and self.bound == 'ANONYMOUS'):
+            raise STRONG_AUTH_REQUIRED({'info': 'modifications require authentication', 'desc': 'Strong(er) authentication required'})
         
         elems = explode_dn(dn)
         elems.reverse()
@@ -451,6 +509,8 @@ class FakeLDAPConnection(object):
     def delete_s(self, dn):
         if self.invalid:
             raise LDAPError('LDAP connection invalid')
+        if self.bound is None or (_requires_auth(self.conn_str) and self.bound == 'ANONYMOUS'):
+            raise STRONG_AUTH_REQUIRED({'info': 'modifications require authentication', 'desc': 'Strong(er) authentication required'})
         
         elems = explode_dn(dn)
         elems.reverse()
@@ -471,6 +531,8 @@ class FakeLDAPConnection(object):
     def modify_s(self, dn, modlist):
         if self.invalid:
             raise LDAPError('LDAP connection invalid')
+        if self.bound is None or (_requires_auth(self.conn_str) and self.bound == 'ANONYMOUS'):
+            raise STRONG_AUTH_REQUIRED({'info': 'modifications require authentication', 'desc': 'Strong(er) authentication required'})
         
         elems = explode_dn(dn)
         elems.reverse()
@@ -521,6 +583,8 @@ class FakeLDAPConnection(object):
     def modrdn_s(self, dn, newrdn, delold=True):
         if self.invalid:
             raise LDAPError('LDAP connection invalid')
+        if self.bound is None or (_requires_auth(self.conn_str) and self.bound == 'ANONYMOUS'):
+            raise STRONG_AUTH_REQUIRED({'info': 'modifications require authentication', 'desc': 'Strong(er) authentication required'})
         
         elems = explode_dn(dn)
         orig_base = elems[1:]
@@ -570,7 +634,7 @@ class FakeLDAPConnection(object):
 
 
 class ldapobject(object):
-    class ReconnectLDAPObject(FakeLDAPConnection):
+    class ReconnectLDAPObject(_FakeLDAPConnection):
         def __init__(self, *ignored):
             pass
         
