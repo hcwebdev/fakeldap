@@ -550,7 +550,10 @@ class _FakeLDAPConnection(object):
         
         for mod in modlist:
             if mod[0] == MOD_REPLACE:
-                rec[mod[1]] = mod[2]
+                if not isinstance(mod[2], (list, tuple)):
+                    rec[mod[1]] = [mod[2]]
+                else:
+                    rec[mod[1]] = mod[2]
             elif mod[0] == MOD_ADD:
                 cur_val = rec.get(mod[1], [])
                 if isinstance(mod[2], (list, tuple)):
