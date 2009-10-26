@@ -180,7 +180,7 @@ def _walk_the_tree(tree):
 _FLTR = r'\(\w*?=[\*\w\s=,\\]*?\)'
 _OP = '[&\|\!]{1}'
 
-FLTR = r'\((?P<attr>\w*?)(?P<comp>=)(?P<value>[\*\w\s=,\\\']*?)\)'
+FLTR = r'\((?P<attr>\w*?)(?P<comp>=)(?P<value>[\*\w\@\.\s=,\\\']*?)\)'
 FLTR_RE = re.compile(FLTR + '(?P<fltr>.*)')
 
 OP = '\((?P<op>(%s))(?P<fltr>(%s)*)\)' % (_OP, _FLTR)
