@@ -165,7 +165,7 @@ class FakeLDAPAddingTestCase(FakeLDAPTestCase):
         ldapurl = 'ldap://ldap.example.com'
         dom = 'dc=example,dc=com'
         dn = 'uid=uid1,%s' % dom
-        attrs = dict(testattr='testattr1')
+        attrs = [('testattr','testattr1')]
         backend._addTreeItems(ldapurl, dom)
         c = backend.initialize(ldapurl)
         c.simple_bind_s()
@@ -202,7 +202,7 @@ class FakeLDAPAddingTestCase(FakeLDAPTestCase):
         ldapurl = 'ldap://ldap.example.com'
         dom = 'dc=example,dc=com'
         dn = 'uid=uid1,%s' % dom
-        attrs = dict(testattr='testattr1')
+        attrs = [('testattr','testattr1')]
         backend._addTreeItems(ldapurl, dom)
         c = backend.initialize(ldapurl)
         c.simple_bind_s()

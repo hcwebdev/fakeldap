@@ -499,7 +499,7 @@ class _FakeLDAPConnection(object):
             tree_pos[rdn] = cidict({'dn': dn, k: [v]})
             rec = tree_pos[rdn]
             
-            for key, val in modlist.items():
+            for key, val in modlist:
                 if isinstance(val, list):
                     rec[key] = val
                 else:
