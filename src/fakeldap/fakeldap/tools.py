@@ -41,5 +41,24 @@ def exists(url, dn):
     return False
 
 
+from ldif import LDIFParser
+
+class LDIFLoader(LDIFParser):
+    def __init__(self, url, ldif_file):
+        fh = open(ldif_file, 'rb')
+        LDIFParser.__init__(self, fh)
+        self.url = url
+    
+    def handle(self, dn, entry):
+        backend._addTreeItems(self.url, dn, entry)
+
+def populate_from_ldif(url, ldif_file, base=None):
+    if base:
+        backend._addTreeItems(url, base)
+    
+    parser = LDIFLoader(url, ldif_file)
+    parser.parse()
+
+
 
 

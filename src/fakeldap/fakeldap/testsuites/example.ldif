@@ -1,0 +1,13 @@
+dn: dc=example,dc=com
+objectClass: domain
+
+dn: ou=users,dc=example,dc=com
+ou: users
+objectClass: top
+objectClass: organizationalUnit
+
+dn: cn=Michael Stroeder,ou=users,dc=example,dc=com
+cn: Michael Stroeder
+objectClass: top
+objectClass: person
+sn: Stroeder

@@ -104,6 +104,13 @@ class ToolsTestCase(unittest.TestCase):
         result = tools.check_password(ldapurl, 'uid=jradford,ou=users,dc=example,dc=com', 'password')
         self.assert_(result)
     
+    def test_populate_from_ldif(self):
+        import os
+        ldapurl = 'ldap://ldap.example.com'
+        testfile = os.path.dirname(__file__) + '/example.ldif'
+        tools.populate_from_ldif(ldapurl, testfile)
+        import fakeldap.backend
+        print fakeldap.backend.TREE
 
 
 
